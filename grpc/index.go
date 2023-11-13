@@ -5,7 +5,6 @@ import (
 	"net"
 
 	gm "github.com/log-agent/emqx-grpc/grpc/proto"
-	helper "github.com/snowlyg/win-helper"
 	"google.golang.org/grpc"
 )
 
@@ -30,19 +29,4 @@ func GrpcRun() error {
 		return fmt.Errorf("grpc start error:%w", err)
 	}
 	return nil
-}
-
-func GetServiceStatus(status helper.Status) string {
-	switch status {
-	case helper.StatusRunning:
-		return "Running"
-	case helper.StatusStopped:
-		return "Stopped"
-	case helper.StatusUninstall:
-		return "Uninstall"
-	case helper.StatusUnknown:
-		return "Unknown"
-	default:
-		return "Unknown"
-	}
 }

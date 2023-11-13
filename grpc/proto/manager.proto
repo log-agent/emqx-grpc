@@ -1,5 +1,5 @@
 syntax = "proto3";
-option go_package = "grpc/manager";
+option go_package = "grpc/proto";
 
 service GrpcManager {
   // 服务控制
