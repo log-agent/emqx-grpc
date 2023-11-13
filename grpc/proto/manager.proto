@@ -1,0 +1,61 @@
+syntax = "proto3";
+option go_package = "grpc/manager";
+
+service GrpcManager {
+  // 服务控制
+  rpc ExecServiceControl(Request) returns (Response);
+  rpc ExecEmqxControl(EmqxRequest) returns (EmqxResponse);
+  rpc UploadFile(stream UploadRequest) returns (UploadResponse) {}
+  rpc GetService(ServiceRequest) returns (ServiceResponse);
+}
+
+message Request {
+  string ser_name = 1;
+  string active = 2; // start,stop,restart,status
+}
+
+message Response {
+  int32 status = 1;
+  bytes data = 2;
+  string message = 3;
+}
+
+message EmqxRequest {
+  string ser_name = 1;
+  string active = 2; // start,stop,restart,status
+}
+
+message EmqxResponse {
+  int32 status = 1;
+  bytes data = 2;
+  string message = 3;
+}
+
+message UploadRequest {
+  bytes file_chunk = 1;
+  string file_name = 2;
+  string file_type = 3;
+  string ser_name = 4;
+  string direction_type = 5;
+  string file_md5   = 6;
+}
+
+message UploadResponse {
+  int32 status = 1;
+  string message = 2;
+}
+
+message ServiceRequest {}
+
+message ServiceResponse {
+  int32 status = 1;
+  string message = 2;
+  message Service {
+    string ser_name = 1;
+    string ser_url = 2;
+    string ser_name_display = 3;
+    string ser_status = 4;
+    bool enable = 5;
+  }
+  repeated Service services = 3;
+}
