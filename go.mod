@@ -4,13 +4,13 @@ go 1.20
 
 require (
 	github.com/snowlyg/helper v0.1.43
-	github.com/snowlyg/win-helper v0.0.0-20231027002820-6a7407d5a371
 	google.golang.org/grpc v1.59.0
 	google.golang.org/protobuf v1.31.0
 )
 
 require (
 	github.com/golang/protobuf v1.5.3 // indirect
+	github.com/kr/text v0.2.0 // indirect
 	golang.org/x/net v0.14.0 // indirect
 	golang.org/x/sys v0.13.0 // indirect
 	golang.org/x/text v0.12.0 // indirect
