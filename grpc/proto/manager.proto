@@ -12,6 +12,7 @@ service GrpcManager {
 message Request {
   string ser_name = 1;
   string active = 2; // start,stop,restart,status
+  string directory = 3;
 }
 
 message Response {
@@ -38,6 +39,7 @@ message UploadRequest {
   string ser_name = 4;
   string direction_type = 5;
   string file_md5   = 6;
+  string ser_path   = 7;
 }
 
 message UploadResponse {
@@ -55,7 +57,9 @@ message ServiceResponse {
     string ser_url = 2;
     string ser_name_display = 3;
     string ser_status = 4;
-    bool enable = 5;
+    string directory = 5;
+    bool enable = 6;
+    bool upgrade = 7;
   }
   repeated Service services = 3;
 }
