@@ -1,3 +1,4 @@
+go env -w GO111MODULE=on
 go build  -ldflags '-w -s'  -o ./upload.exe ./main.go
 
 timeout /t 1
@@ -9,11 +10,11 @@ go build  -ldflags "-w -s"  -o ./upload main.go
 
 timeout /t 1
 
-pscp -v -P 22 -pw "P@ssw0rd" ./upload "root@10.0.1.83:/var/www/html/upload"
+pscp -v -P 22 -pw "P@ssw0rd" ./upload "root@10.0.0.83:/var/www/html/upload"
 
 timeout /t 1
 
-pscp -v -P 22 -pw "P@ssw0rd" ./upload.exe "root@10.0.1.83:/var/www/html/upload.exe"
+pscp -v -P 22 -pw "P@ssw0rd" ./upload.exe "root@10.0.0.83:/var/www/html/upload.exe"
 
 go env -w GOOS=windows 
 go env -w CGO_ENABLED=1

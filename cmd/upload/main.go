@@ -183,7 +183,7 @@ func getSerName(host string) string {
 		return "BAFYBJV1"
 	case "http://szfth.server.chindeo.test":
 		return "FTHospital"
-	case "http://group.chindeo.test":
+	case "http://gzwyh.server.chindeo.test":
 		return "GZWYHospitalV1"
 	case "http://fxkzh.server.chindeo.test":
 		return "FXKZHospitalV1"
