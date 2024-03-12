@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"strings"
 
 	gm "github.com/log-agent/emqx-grpc/grpc/proto"
 	"github.com/snowlyg/helper/str"
@@ -26,6 +27,18 @@ func (s *ManagerServer) ExecEmqxControl(ctx context.Context, in *gm.EmqxRequest)
 		if err != nil {
 			ok.Status = http.StatusBadRequest
 			ok.Message = err.Error()
+		}
+	case "status":
+		// docker ps | grep container-name
+		output, err := sys.CmdOutTrim("docker", "ps")
+		// log.Println(output)
+		// log.Println(err)
+		if err != nil {
+			ok.Status = http.StatusBadRequest
+			ok.Message = err.Error()
+		} else if !strings.Contains(output, in.SerName) {
+			ok.Status = http.StatusBadRequest
+			ok.Message = in.SerName + " is stoped"
 		}
 	default:
 		ok.Message = str.Join("操作类型错误:", in.Active)
