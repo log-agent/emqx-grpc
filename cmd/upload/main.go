@@ -2,13 +2,16 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	gm "github.com/log-agent/emqx-grpc/grpc/proto"
@@ -43,11 +46,15 @@ func main() {
 	hostFlag := *host
 	nameFlag := *serName
 	if nameFlag == "" {
-		nameFlag = getSerName(hostFlag)
-		if nameFlag == "" {
+		var err error
+		if nameFlag, err = getSerName(hostFlag); err != nil {
+			log.Println("grpc.Dial", err.Error())
+			os.Exit(1)
+		} else if nameFlag == "" {
 			log.Println("SerName is required")
 			os.Exit(1)
 		}
+
 		hostFlag = "10.0.0.35:18088"
 		if nameFlag == "doisWeb" {
 			hostFlag = "10.0.0.23:18088"
@@ -142,52 +149,193 @@ func main() {
 	}
 }
 
-func getSerName(host string) string {
+var (
+	gRC     *Grpcurl
+	grpcUri string
+)
+
+// SingleGrc
+func SingleGrc(host ...string) *Grpcurl {
+	if host != nil && host[0] != "" {
+		grpcUri = host[0]
+	}
+	once := sync.Once{}
+	once.Do(getGrc)
+	return gRC
+}
+
+// getGrc
+func getGrc() {
+	gRC = &Grpcurl{}
+	gRC.Host = grpcUri
+	if err := gRC.Init(); err != nil {
+		log.Println("grpc.Init", err.Error())
+		return
+	}
+}
+
+func getSerName(host string) (string, error) {
+	uri := "10.0.0.35:18088"
 	if host == "http://10.0.0.23" {
-		return "doisWeb"
+		uri = "10.0.0.23:18088"
+		return "doisWeb", nil
 	}
-	switch host {
-	case "http://dgzyh.server.chindeo.test":
-		return "DGZYHospitalV1"
-	case "http://zhrmh.server.chindeo.test":
-		return "ZHRMV2"
-	case "http://whsyh.server.chindeo.test":
-		return "WHSYV2"
-	case "http://tjhhh.server.chindeo.test":
-		return "TJHHV1"
-	case "http://szbdh.server.chindeo.test":
-		return "SZBDHospitalV1"
-	case "http://szsmh.server.chindeo.test":
-		return "SMV1"
-	case "http://shxhh.server.chindeo.test":
-		return "SHXHHospitalV1"
-	case "http://qyysh.server.chindeo.test":
-		return "QYYSHospitalV1"
-	case "http://nfykdh.server.chindeo.test":
-		return "NFYKHospitalV1"
-	case "http://lhrmh.server.chindeo.test":
-		return "LHV2"
-	case "http://lgzxh.server.chindeo.test":
-		return "LGZXHospitalV1"
-	case "http://lggkh.server.chindeo.test":
-		return "LGGGHospitalV1"
-	case "http://jzgah.server.chindeo.test":
-		return "JZGAXRMV1"
-	case "http://gzhqh.server.chindeo.test":
-		return "GZHQV1"
-	case "http://bazxh.server.chindeo.test":
-		return "BAZXV2"
-	case "http://barmh.server.chindeo.test":
-		return "BAHospitalV2"
-	case "http://bafyh.server.chindeo.test":
-		return "BAFYBJV1"
-	case "http://szfth.server.chindeo.test":
-		return "FTHospital"
-	case "http://gzwyh.server.chindeo.test":
-		return "GZWYHospitalV1"
-	case "http://fxkzh.server.chindeo.test":
-		return "FXKZHospitalV1"
-	default:
-		return ""
+
+	res, err := SingleGrc(uri).SerList()
+	if err != nil {
+		return "", err
 	}
+
+	for _, server := range res.Services {
+		if host == server.SerUrl {
+			return server.SerName, nil
+		}
+	}
+
+	return "", errors.New("服务不存在")
+}
+
+type Grpcurl struct {
+	Host string
+	conn *grpc.ClientConn
+}
+
+func (grc *Grpcurl) initGrpcConn() (*grpc.ClientConn, error) {
+	conn, err := grpc.Dial(grc.Host, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithTimeout(30*time.Second))
+	if err != nil {
+		return nil, err
+	}
+
+	return conn, nil
+}
+
+func (grc *Grpcurl) Start(serName string) error {
+	req := &gm.Request{SerName: serName, Active: "start"}
+	if _, err := grc.action(req); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (grc *Grpcurl) Restart(serName, directory string) error {
+	req := &gm.Request{SerName: serName, Active: "restart", Directory: directory}
+	if _, err := grc.action(req); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (grc *Grpcurl) Stop(serName string) error {
+	req := &gm.Request{SerName: serName, Active: "stop"}
+	if _, err := grc.action(req); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (grc *Grpcurl) Status(serName string) (*gm.Response, error) {
+	req := &gm.Request{SerName: serName, Active: "status"}
+	response, err := grc.action(req)
+	if err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// Init
+func (grc *Grpcurl) Init() error {
+	conn, err := grc.initGrpcConn()
+	if err != nil {
+		return err
+	}
+	grc.conn = conn
+	return nil
+}
+
+// action
+func (grc *Grpcurl) action(req *gm.Request) (*gm.Response, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	c := gm.NewGrpcManagerClient(grc.conn)
+	re, err := c.ExecServiceControl(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return re, nil
+}
+
+// activeDevice
+func (grc *Grpcurl) Close() {
+	if grc.conn != nil {
+		grc.conn.Close()
+	}
+}
+
+// list
+func (grc *Grpcurl) list(req *gm.ServiceRequest) (*gm.ServiceResponse, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	c := gm.NewGrpcManagerClient(grc.conn)
+	re, err := c.GetService(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return re, nil
+}
+
+func (grc *Grpcurl) SerList() (*gm.ServiceResponse, error) {
+	req := &gm.ServiceRequest{}
+	response, err := grc.list(req)
+	if err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+// list
+func (grc *Grpcurl) emqx(req *gm.EmqxRequest) (*gm.EmqxResponse, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	c := gm.NewGrpcManagerClient(grc.conn)
+	re, err := c.ExecEmqxControl(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return re, nil
+}
+
+func (grc *Grpcurl) EmqxStart(serName string) error {
+	req := &gm.EmqxRequest{SerName: serName, Active: "start"}
+	resp, err := grc.emqx(req)
+	if err != nil {
+		return err
+	}
+	log.Println("EmqxStart:", resp.Message)
+	return nil
+}
+
+func (grc *Grpcurl) EmqxStop(serName string) error {
+	req := &gm.EmqxRequest{SerName: serName, Active: "stop"}
+	if _, err := grc.emqx(req); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (grc *Grpcurl) EmqxStatus(serName string) (bool, error) {
+	req := &gm.EmqxRequest{SerName: serName, Active: "status"}
+	if res, err := grc.emqx(req); err != nil {
+		return false, err
+	} else {
+		if res.Status == http.StatusBadRequest {
+			return false, fmt.Errorf(res.Message)
+		}
+	}
+	return true, nil
 }
